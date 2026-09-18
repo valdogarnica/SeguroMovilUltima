@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">SeguroMovilUltima</string>
+    <string name="accessibility_service_description">Detecta el menú de apagado para activar el modo de apagado falso y proteger tu dispositivo.</string>
+</resources>

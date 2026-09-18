@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "643133019289",
+    "project_id": "seguromovilultima",
+    "storage_bucket": "seguromovilultima.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:643133019289:android:108637740a8ac014de5408",
+        "android_client_info": {
+          "package_name": "com.DevG2Studios.seguromovilultima"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCTWJ_uJIf80vFaT8YIPCMclwcZfNipPLw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
