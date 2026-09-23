@@ -3,6 +3,7 @@ package com.DevG2Studios.seguromovilultima.data.remote.service
 
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import com.DevG2Studios.seguromovilultima.services.CommandExecutorService
@@ -11,6 +12,8 @@ class CameraTriggerActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+
 
         val command = intent.getStringExtra(CommandExecutorService.EXTRA_COMMAND)
         val commandId = intent.getLongExtra(CommandExecutorService.EXTRA_COMMAND_ID, -1L)

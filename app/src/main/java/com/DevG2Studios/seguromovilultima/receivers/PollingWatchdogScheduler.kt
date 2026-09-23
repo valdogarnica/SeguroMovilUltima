@@ -1,3 +1,4 @@
+
 package com.DevG2Studios.seguromovilultima.receivers
 
 import android.app.AlarmManager
@@ -11,29 +12,36 @@ import android.util.Log
 object PollingWatchdogScheduler {
 
     private const val TAG = "POLLING_WATCHDOG"
-    private const val INTERVAL_MS = 60_000L
+    private const val REQUEST_CODE = 5001
+    private const val INTERVAL_MS = 15 * 60 * 1000L //
 
     fun scheduleNext(context: Context) {
-        val intent = Intent(context, PollingWatchdogReceiver::class.java)
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, WatchdogReceiver::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
-            context, 0, intent,
+            context, REQUEST_CODE, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val triggerAt = SystemClock.elapsedRealtime() + INTERVAL_MS
 
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-                Log.w(TAG, "No se puede programar alarma exacta: falta el permiso SCHEDULE_EXACT_ALARM")
-                return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (alarmManager.canScheduleExactAlarms()) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pendingIntent
+                )
+            } else {
+                // fallback: alarma inexacta si el usuario no dio el permiso
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pendingIntent
+                )
             }
+        } else {
             alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                SystemClock.elapsedRealtime() + INTERVAL_MS,
-                pendingIntent
+                AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pendingIntent
             )
-        } catch (e: SecurityException) {
-            Log.e(TAG, "SecurityException al programar alarma: ${e.message}")
         }
     }
+
 }
+

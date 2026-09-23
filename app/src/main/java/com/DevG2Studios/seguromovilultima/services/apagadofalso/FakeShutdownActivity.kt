@@ -38,6 +38,11 @@ import kotlinx.coroutines.delay
 
 class FakeShutdownActivity : ComponentActivity() {
 
+    companion object {
+        @Volatile
+        var instance: FakeShutdownActivity? = null
+    }
+
     private var volumeUpPressStart: Long = 0L
     private val exitHandler = Handler(Looper.getMainLooper())
     private var exitRunnable: Runnable? = null
@@ -52,6 +57,7 @@ class FakeShutdownActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        instance = this
         Log.d("FAKE_SHUTDOWN_LIFECYCLE", "onCreate — stage actual: ${FakeShutdownStageHolder.current}")
         configureOverLockScreen()
         hideSystemBars()
@@ -113,6 +119,7 @@ class FakeShutdownActivity : ComponentActivity() {
     private fun applyOffState() {
         setBrightnessToZero()
         enableDoNotDisturb()
+        ShutdownMenuAccessibilityService.instance?.showBlackOverlay() // NUEVO
     }
 
     private fun hideSystemBars() {
@@ -193,6 +200,7 @@ class FakeShutdownActivity : ComponentActivity() {
     }
 
     fun closeFakeShutdown() {
+        ShutdownMenuAccessibilityService.instance?.hideBlackOverlay() // NUEVO
         restoreNotifications()
         restoreNormalBrightness()
         ShutdownMenuAccessibilityService.isFakeShutdownUiShowing = false
@@ -245,6 +253,8 @@ class FakeShutdownActivity : ComponentActivity() {
         exitRunnable?.let { exitHandler.removeCallbacks(it) }
         hideBarsHandler.removeCallbacks(hideBarsRunnable)
         ShutdownMenuAccessibilityService.isFakeShutdownUiShowing = false
+        ShutdownMenuAccessibilityService.instance?.hideBlackOverlay()
+        if (instance == this) instance = null
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

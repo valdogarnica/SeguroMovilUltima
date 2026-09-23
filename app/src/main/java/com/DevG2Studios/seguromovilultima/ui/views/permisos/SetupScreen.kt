@@ -9,7 +9,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -21,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -32,14 +32,12 @@ import com.DevG2Studios.seguromovilultima.services.LocationForegroundService
 import com.DevG2Studios.seguromovilultima.service.codigoIncorrecto.VideoCaptureHelper
 import com.DevG2Studios.seguromovilultima.ui.debug.DebugToolsViewModel
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
-private fun isServiceRunning(context: Context, serviceClass: Class<*>): Boolean {
-    val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-    @Suppress("DEPRECATION")
-    return manager.getRunningServices(Integer.MAX_VALUE).any {
-        it.service.className == serviceClass.name
-    }
-}
+import com.DevG2Studios.seguromovilultima.utils.ServiceUtils
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,10 +159,49 @@ fun SetupScreen(
         hasNotificationPermission = granted
     }
 
-    // --- NUEVO: estado del rastreo de ubicación continuo ---
+    // --- Estado del rastreo de ubicación continuo ---
     var isProtectionActive by remember {
-        mutableStateOf(isServiceRunning(context, LocationForegroundService::class.java))
+        mutableStateOf(ServiceUtils.isServiceRunning(context, LocationForegroundService::class.java))
     }
+
+    // --- NUEVO: acceso a notificaciones (para NotificationListenerService) ---
+    var hasNotificationListenerAccess by remember {
+        mutableStateOf(XiaomiPermissionHelper.isNotificationListenerEnabled(context))
+    }
+    val notificationListenerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        hasNotificationListenerAccess = XiaomiPermissionHelper.isNotificationListenerEnabled(context)
+    }
+
+
+   /* val lifecycleOwnerForProtection = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwnerForProtection) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isProtectionActive = ProtectionManager.isActuallyRunning(context)
+            }
+        }
+        lifecycleOwnerForProtection.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwnerForProtection.lifecycle.removeObserver(observer) }
+    }*/
+
+    // Agrega este estado junto a los demás
+    var hasExactAlarmPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (context.getSystemService(AlarmManager::class.java)).canScheduleExactAlarms()
+            } else true
+        )
+    }
+    val exactAlarmLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            hasExactAlarmPermission = (context.getSystemService(AlarmManager::class.java)).canScheduleExactAlarms()
+        }
+    }
+
 
     Scaffold(
         topBar = {
@@ -200,8 +237,28 @@ fun SetupScreen(
                     Text(if (hasNotificationPermission) "Notificaciones permitidas ✓" else "Permitir notificaciones")
                 }
             }
+
+            // --- NUEVO: acceso a notificaciones, junto a lo demás de notificaciones ---
             Spacer(modifier = Modifier.height(12.dp))
             Button(
+                onClick = {
+                    if (!hasNotificationListenerAccess) {
+                        notificationListenerLauncher.launch(
+                            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (hasNotificationListenerAccess) "Acceso a notificaciones ✓" else "Permitir acceso a notificaciones")
+            }
+            Text(
+                "Necesario para detectar si el usuario elimina la notificación de sincronización y reiniciarla.",
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+            /*Button(
                 onClick = {
                     if (!hasFineLocation) return@Button
                     if (isProtectionActive) {
@@ -215,10 +272,43 @@ fun SetupScreen(
                     }
                 },
                 enabled = hasFineLocation,
-
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(if (isProtectionActive) "Proteccion Activa ✓" else "Proteccion Inactiva")
+            }*/
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Protección activa",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = if (isProtectionActive) "Monitoreando el dispositivo" else "Desactivada",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = isProtectionActive,
+                    onCheckedChange = { checked ->
+                        if (!hasFineLocation) return@Switch
+
+                        val prefs = context.getSharedPreferences("app_state", Context.MODE_PRIVATE)
+                        if (checked) {
+                            context.startForegroundService(Intent(context, LocationForegroundService::class.java))
+                            prefs.edit().putBoolean("protection_enabled", true).apply()
+                        } else {
+                            context.stopService(Intent(context, LocationForegroundService::class.java))
+                            prefs.edit().putBoolean("protection_enabled", false).apply()
+                        }
+                        isProtectionActive = checked
+                        viewModel.setLocationTrackingEnabled(checked)
+                    },
+                    enabled = hasFineLocation
+                )
             }
 
             Text("General", style = MaterialTheme.typography.titleSmall)
@@ -264,6 +354,28 @@ fun SetupScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(if (hasAudioPermission) "Micrófono permitido ✓" else "Permitir grabar audio en videos")
+            }
+            // la funcion heurfana
+            Spacer(modifier = Modifier.height(12.dp))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Button(
+                    onClick = {
+                        if (!hasExactAlarmPermission) {
+                            exactAlarmLauncher.launch(
+                                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                    data = "package:${context.packageName}".toUri()
+                                }
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (hasExactAlarmPermission) "Alarmas exactas permitidas ✓" else "Permitir alarmas exactas")
+                }
+                Text(
+                    "Necesario para que el watchdog reinicie el servicio de forma puntual, incluso en reposo profundo.",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -413,9 +525,142 @@ fun SetupScreen(
             ) {
                 Text(if (canUseFullScreenIntent) "Pantalla completa permitida ✓" else "Permitir notificaciones de pantalla completa")
             }
+
+            // --- Sección Xiaomi ---
+            val isXiaomi = remember { XiaomiPermissionHelper.isXiaomiDevice() }
+
+            if (isXiaomi) {
+                Spacer(modifier = Modifier.height(24.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text("Ajustes específicos de Xiaomi", style = MaterialTheme.typography.titleSmall)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Necesarios para que el servicio no sea cerrado por el sistema.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                var autoStartDone by remember {
+                    mutableStateOf(
+                        XiaomiPermissionHelper.isAutoStartEnabled(context)
+                            ?: XiaomiPermissionHelper.isAutoStartConfirmed(context)
+                    )
+                }
+                var showConfirmDialog by remember { mutableStateOf(false) }
+                var wentToSettings by remember { mutableStateOf(false) }
+
+                val lifecycleOwner = LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            if (wentToSettings) {
+                                wentToSettings = false
+                                val detected = XiaomiPermissionHelper.isAutoStartEnabled(context)
+                                if (detected != null) {
+                                    autoStartDone = detected
+                                } else {
+                                    showConfirmDialog = true
+                                }
+                            }
+                            // refresca también el acceso a notificaciones al volver de cualquier ajuste
+                            hasNotificationListenerAccess =
+                                XiaomiPermissionHelper.isNotificationListenerEnabled(context)
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                }
+
+                if (showConfirmDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showConfirmDialog = false },
+                        title = { Text("¿Activaste el inicio automático?") },
+                        text = { Text("No podemos verificarlo automáticamente en este dispositivo.") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                XiaomiPermissionHelper.setAutoStartConfirmed(context, true)
+                                autoStartDone = true
+                                showConfirmDialog = false
+                            }) { Text("Sí, ya lo activé") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showConfirmDialog = false }) { Text("No") }
+                        }
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        wentToSettings = true
+                        XiaomiPermissionHelper.openAutoStartSettings(context)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (autoStartDone) "Inicio automático ✓" else "Activar inicio automático")
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        if (!isIgnoringBatteryOpt) {
+                            batteryOptLauncher.launch(
+                                XiaomiPermissionHelper.requestIgnoreBatteryOptimizations(context)
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (isIgnoringBatteryOpt) "Batería sin restricciones ✓" else "Poner batería en 'Sin restricciones'")
+                }
+                // --- NUEVO: batería específica de Xiaomi (pantalla nativa MIUI, distinta de la de Android) ---
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = { XiaomiPermissionHelper.openXiaomiAppBatterySettings(context) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Ajustar batería en MIUI (avanzado)")
+                }
+                Text(
+                    "Abre el control de batería propio de Xiaomi para esta app. Selecciona 'Sin restricciones'.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+// --- NUEVO: desactivar optimización de MIUI ---
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = { XiaomiPermissionHelper.openMiuiOptimizationSettings(context) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Desactivar optimización de MIUI")
+                }
+                Text(
+                    "Activa Opciones de desarrollador si no aparece, luego busca 'Desactivar optimización de MIUI' y actívalo. Requiere reiniciar el teléfono.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            "Bloquear en Recientes",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Abre la app, ve a Recientes (□), desliza esta app hacia abajo " +
+                                    "y toca el ícono de candado para bloquearla. Esto no se puede " +
+                                    "activar por código, es un paso manual del usuario.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
         }
     }
 }
+
 fun requestExactAlarmPermission(context: Context) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
@@ -427,6 +672,7 @@ fun requestExactAlarmPermission(context: Context) {
         }
     }
 }
+
 private fun isPermissionGranted(context: Context, permission: String): Boolean {
     return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 }
