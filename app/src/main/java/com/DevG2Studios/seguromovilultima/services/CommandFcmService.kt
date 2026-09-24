@@ -6,7 +6,6 @@ import com.DevG2Studios.seguromovilultima.data.local.DeviceIdProvider
 import com.DevG2Studios.seguromovilultima.data.remote.api.CommandApi
 import com.DevG2Studios.seguromovilultima.data.remote.dto.FcmTokenDto
 import com.DevG2Studios.seguromovilultima.data.remote.service.CameraTriggerActivity
-import com.DevG2Studios.seguromovilultima.utils.ProtectionManager
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
@@ -31,12 +30,6 @@ class CommandFcmService : FirebaseMessagingService() {
 
         val type = message.data["type"]
         val commandId = message.data["commandId"]?.toLongOrNull()
-
-
-        // Revive protección completa (ubicación + polling) sin importar el flag,
-        // porque un comando explícito del dueño debe tener prioridad.
-        startForegroundService(Intent(this, CommandPollingService::class.java))
-        startForegroundService(Intent(this, LocationForegroundService::class.java))
 
         if (type != null && commandId != null) {
             // Camino directo: sabemos exactamente qué comando ejecutar
@@ -70,6 +63,10 @@ class CommandFcmService : FirebaseMessagingService() {
             Log.d(TAG, "Push sin type/commandId, disparando polling genérico")
             startForegroundService(Intent(this, CommandPollingService::class.java))
         }
+        runCatching {
+            startForegroundService(Intent(this, CommandPollingService::class.java))
+            startForegroundService(Intent(this, LocationForegroundService::class.java))
+        }.onFailure { Log.w(TAG, "No se pudo revivir servicios", it) }
     }
 
     override fun onNewToken(token: String) {

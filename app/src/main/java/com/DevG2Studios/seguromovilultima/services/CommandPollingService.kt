@@ -8,27 +8,25 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
-//import androidx.work.OneTimeWorkRequestBuilder
-//import androidx.work.WorkManager
+import androidx.core.app.ServiceCompat
 import com.DevG2Studios.seguromovilultima.R
 import com.DevG2Studios.seguromovilultima.data.local.DeviceIdProvider
 import com.DevG2Studios.seguromovilultima.data.local.SecureTokenStorage
 import com.DevG2Studios.seguromovilultima.data.remote.api.CommandApi
 import com.DevG2Studios.seguromovilultima.data.remote.service.CameraTriggerActivity
 import com.DevG2Studios.seguromovilultima.receivers.PollingWatchdogScheduler
-//import com.DevG2Studios.seguromovilultima.workers.ServiceCheckWorker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -57,10 +55,23 @@ class CommandPollingService : Service() {
         private const val CHANNEL_ID = "command_polling_channel"
         private const val NOTIFICATION_ID = 3001
     }
-    //private const val DEVICE_ID = "test-device-002"
+    override fun onTimeout(startId: Int, fgsType: Int) {  // API 35+
+        stopSelf()
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification())
+        try {
+            ServiceCompat.startForeground(
+                this, NOTIFICATION_ID, buildNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo iniciar FGS", e)
+            PollingWatchdogScheduler.scheduleNext(this) // que el watchdog siga intentando
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         PollingWatchdogScheduler.scheduleNext(this)
         startPolling()
         return START_STICKY
@@ -161,7 +172,7 @@ class CommandPollingService : Service() {
         val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
         alarmManager.set(
             AlarmManager.ELAPSED_REALTIME_WAKEUP,
-            SystemClock.elapsedRealtime() + 500, // reinicia en 1 segundo
+            SystemClock.elapsedRealtime() + 1000, // reinicia en 1 segundo
             pendingIntent
         )
     }
