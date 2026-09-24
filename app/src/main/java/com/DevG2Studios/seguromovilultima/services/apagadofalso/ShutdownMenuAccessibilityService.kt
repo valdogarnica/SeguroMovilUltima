@@ -202,6 +202,7 @@ class ShutdownMenuAccessibilityService : AccessibilityService() {
 
     // --- NUEVO: overlay negro real por encima del status bar ---
 
+    @Suppress("DEPRECATION")
     fun showBlackOverlay() {
         if (overlayView != null) return
 
@@ -211,7 +212,6 @@ class ShutdownMenuAccessibilityService : AccessibilityService() {
             setBackgroundColor(Color.BLACK)
             // Igual que en la técnica de referencia: fuerza modo inmersivo
             // también sobre la propia ventana del overlay, no solo la Activity.
-            @Suppress("DEPRECATION")
             systemUiVisibility = (
                     View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
                             View.SYSTEM_UI_FLAG_FULLSCREEN or
@@ -236,15 +236,17 @@ class ShutdownMenuAccessibilityService : AccessibilityService() {
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN or
-                    @Suppress("DEPRECATION")
                     WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS or
-                    @Suppress("DEPRECATION")
                     WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION,
             PixelFormat.OPAQUE
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = -pixelOffset
             y = -pixelOffset
+            // NUEVO: fuerza el mismo brillo mínimo directamente en esta ventana,
+            // que ahora es la que queda por encima de la Activity.
+            screenBrightness = 0.01f
+            buttonBrightness = 0f
         }
 
         try {
