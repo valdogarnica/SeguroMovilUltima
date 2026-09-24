@@ -15,12 +15,16 @@ class BootReceiver : BroadcastReceiver() {
             action == "com.htc.intent.action.QUICKBOOT_POWERON"
         ) {
             Log.d("BOOT_RECEIVER", "Reiniciando polling tras arranque del sistema")
-            context.startForegroundService(Intent(context, CommandPollingService::class.java))
+            runCatching {
+                context.startForegroundService(Intent(context, CommandPollingService::class.java))
+            }.onFailure { Log.w("BOOT_RECEIVER", "No se pudo arrancar polling", it) }
 
             val prefs = context.getSharedPreferences("app_state", Context.MODE_PRIVATE)
             if (prefs.getBoolean("protection_enabled", false)) {
                 Log.d("BOOT_RECEIVER", "Reiniciando ubicación (el usuario la había activado)")
-                context.startForegroundService(Intent(context, LocationForegroundService::class.java))
+                runCatching {
+                    context.startForegroundService(Intent(context, LocationForegroundService::class.java))
+                }.onFailure { Log.w("BOOT_RECEIVER", "No se pudo arrancar ubicación", it) }
             }
         }
     }

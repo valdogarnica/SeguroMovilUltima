@@ -13,7 +13,9 @@ class WatchdogReceiver : BroadcastReceiver() {
             val isRunning = ServiceUtils.isServiceRunning(context, CommandPollingService::class.java)
             if (!isRunning) {
                 Log.d("WATCHDOG", "Servicio caído, reiniciando")
-                context.startForegroundService(Intent(context, CommandPollingService::class.java))
+                runCatching {
+                    context.startForegroundService(Intent(context, CommandPollingService::class.java))
+                }.onFailure { Log.w("WATCHDOG", "No se pudo arrancar el servicio", it) }
                 //ProtectionManager.start(context)
             }
             PollingWatchdogScheduler.scheduleNext(context)
