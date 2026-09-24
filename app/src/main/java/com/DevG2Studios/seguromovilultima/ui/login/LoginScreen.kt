@@ -6,6 +6,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -19,6 +21,8 @@ fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val deviceId = remember { viewModel.deviceId }
+    val clipboardManager = LocalClipboardManager.current
 
     LaunchedEffect(state.isLoggedIn) {
         if (state.isLoggedIn) onLoginSuccess()
@@ -33,7 +37,22 @@ fun LoginScreen(
                 text = "SeguroMovilUltima",
                 style = MaterialTheme.typography.headlineMedium
             )
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // --- ID del dispositivo, dentro del flujo normal ---
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "ID: $deviceId",
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = {
+                    clipboardManager.setText(AnnotatedString(deviceId))
+                }) {
+                    Text("Copiar")
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
 
             OutlinedTextField(
                 value = state.email,

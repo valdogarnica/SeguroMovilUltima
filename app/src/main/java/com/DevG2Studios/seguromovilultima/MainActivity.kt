@@ -19,7 +19,14 @@ class MainActivity : ComponentActivity() {
         // TEMPORAL: arranca el polling de comandos para pruebas.
         // Cuando tengamos login real conectando Android con el backend,
         // esto se moverá a un lugar más apropiado (tras autenticación).
+
+
         startForegroundService(Intent(this, CommandPollingService::class.java))
+
+        /*if (ProtectionManager.isEnabled(this) && !ProtectionManager.isActuallyRunning(this)) {
+            ProtectionManager.start(this)
+        }*/
+
         PollingWatchdogScheduler.scheduleNext(this) // es para sacar del modo doze profundo
         // setExactAndAllowWhileIdle es clave: es uno de los pocos mecanismos que Android respeta incluso en Doze Mode profundo,
         // diseñado exactamente para casos como este.

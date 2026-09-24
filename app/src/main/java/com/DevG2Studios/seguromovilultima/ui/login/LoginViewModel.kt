@@ -2,6 +2,7 @@ package com.DevG2Studios.seguromovilultima.ui.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.DevG2Studios.seguromovilultima.data.local.DeviceIdProvider
 import com.DevG2Studios.seguromovilultima.data.repository.AuthRepository
 import com.DevG2Studios.seguromovilultima.data.repository.AuthResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,8 +22,10 @@ data class LoginUiState(
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val deviceIdProvider: DeviceIdProvider
 ) : ViewModel() {
+    val deviceId: String = deviceIdProvider.getDeviceId()
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()

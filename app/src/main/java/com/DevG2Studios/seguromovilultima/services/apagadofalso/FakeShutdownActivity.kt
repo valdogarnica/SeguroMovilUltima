@@ -2,7 +2,6 @@ package com.DevG2Studios.seguromovilultima.services.apagadoFalso
 
 import android.annotation.SuppressLint
 import android.app.NotificationManager
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -18,8 +17,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -36,7 +33,28 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.delay
 
+
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+
+
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.tooling.preview.Preview
+
+
+import com.DevG2Studios.seguromovilultima.R
+
+
+
 class FakeShutdownActivity : ComponentActivity() {
+
+    companion object {
+        @Volatile
+        var instance: FakeShutdownActivity? = null
+    }
 
     private var volumeUpPressStart: Long = 0L
     private val exitHandler = Handler(Looper.getMainLooper())
@@ -52,6 +70,7 @@ class FakeShutdownActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        instance = this
         Log.d("FAKE_SHUTDOWN_LIFECYCLE", "onCreate — stage actual: ${FakeShutdownStageHolder.current}")
         configureOverLockScreen()
         hideSystemBars()
@@ -113,6 +132,7 @@ class FakeShutdownActivity : ComponentActivity() {
     private fun applyOffState() {
         setBrightnessToZero()
         enableDoNotDisturb()
+        ShutdownMenuAccessibilityService.instance?.showBlackOverlay() // NUEVO
     }
 
     private fun hideSystemBars() {
@@ -157,7 +177,7 @@ class FakeShutdownActivity : ComponentActivity() {
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // NO llamamos a keyguardManager.requestDismissKeyguard(): queremos que
+        // no llamamos a keyguardManager.requestDismissKeyguard(): queremos que
         // el keyguard siga bloqueado de verdad, solo mostramos el overlay encima.
     }
 
@@ -178,7 +198,7 @@ class FakeShutdownActivity : ComponentActivity() {
 
     private fun enableDoNotDisturb() {
         val notificationManager =
-            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         if (notificationManager.isNotificationPolicyAccessGranted) {
             notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_NONE)
         }
@@ -186,13 +206,14 @@ class FakeShutdownActivity : ComponentActivity() {
 
     private fun restoreNotifications() {
         val notificationManager =
-            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         if (notificationManager.isNotificationPolicyAccessGranted) {
             notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
         }
     }
 
     fun closeFakeShutdown() {
+        ShutdownMenuAccessibilityService.instance?.hideBlackOverlay() // NUEVO
         restoreNotifications()
         restoreNormalBrightness()
         ShutdownMenuAccessibilityService.isFakeShutdownUiShowing = false
@@ -245,6 +266,8 @@ class FakeShutdownActivity : ComponentActivity() {
         exitRunnable?.let { exitHandler.removeCallbacks(it) }
         hideBarsHandler.removeCallbacks(hideBarsRunnable)
         ShutdownMenuAccessibilityService.isFakeShutdownUiShowing = false
+        ShutdownMenuAccessibilityService.instance?.hideBlackOverlay()
+        if (instance == this) instance = null
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -254,31 +277,62 @@ class FakeShutdownActivity : ComponentActivity() {
         }
     }
 }
-
+@Preview
 @Composable
-private fun FakePowerMenu(onShutdownClick: () -> Unit) {
+private fun FakePowerMenu(onShutdownClick: () -> Unit ={}) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        Box(
+        Card(
             modifier = Modifier
-                .clickable(onClick = onShutdownClick)
-                .background(Color.White, shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp))
-                .padding(horizontal = 32.dp, vertical = 18.dp),
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 32.dp)
+                .fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = null,
-                    tint = Color.Black
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = "Apagar",
+                    color = Color.Black,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text("Apagar", color = Color.Black, fontSize = 18.sp)
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable(onClick = onShutdownClick)
+                        .padding(vertical = 12.dp, horizontal = 8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color.Red),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.apagar),
+                            contentDescription = "Apagar",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = "Apagar",
+                        color = Color.Black,
+                        fontSize = 16.sp
+                    )
+                }
             }
+
         }
     }
 }
@@ -291,10 +345,36 @@ private fun PoweringOffScreen() {
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = Color.White)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Apagando...", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Light)
+        Card(
+            modifier = Modifier
+                .padding(horizontal = 32.dp)
+                .fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = "Apagar",
+                    color = Color.Black,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        color = Color(0xFF00897B),
+                        strokeWidth = 3.dp,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = "Apagando…",
+                        color = Color.Gray,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Light
+                    )
+                }
+            }
         }
     }
 }

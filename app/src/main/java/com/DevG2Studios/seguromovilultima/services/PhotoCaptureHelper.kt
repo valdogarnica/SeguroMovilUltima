@@ -1,3 +1,6 @@
+// version 1.1 modificacion para encolar los comandos de foto simultaneos, la version original esta en git
+
+
 package com.DevG2Studios.seguromovilultima.services
 
 import android.content.ContentValues
@@ -13,17 +16,29 @@ import androidx.camera.core.ImageCapture.OutputFileResults
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 object PhotoCaptureHelper {
 
-    @Suppress("BlockingMethodInNonBlockingContext")
+    private val captureMutex = Mutex()
+
     suspend fun captureSilentPhoto(
         context: Context,
         lifecycleOwner: LifecycleOwner,
         useFrontCamera: Boolean = true
+    ): String = captureMutex.withLock {
+        captureInternal(context, lifecycleOwner, useFrontCamera)
+    }
+
+    @Suppress("BlockingMethodInNonBlockingContext")
+    private suspend fun captureInternal(
+        context: Context,
+        lifecycleOwner: LifecycleOwner,
+        useFrontCamera: Boolean
     ): String = suspendCancellableCoroutine { continuation ->
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
@@ -45,9 +60,8 @@ object PhotoCaptureHelper {
                 return@addListener
             }
 
-            // Da tiempo a que la sesión de cámara termine de abrir antes de capturar
             Handler(Looper.getMainLooper()).postDelayed({
-                val name = "CERBERUS_${System.currentTimeMillis()}.jpg"
+                val name = "SEGUROMOVILULTIMA_${System.currentTimeMillis()}.jpg"
                 val contentValues = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, name)
                     put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
@@ -75,8 +89,7 @@ object PhotoCaptureHelper {
                         }
                     }
                 )
-            }, 500)
-
+            }, 800) // aumenté el margen, ver punto 2 abajo
         }, ContextCompat.getMainExecutor(context))
     }
 }
