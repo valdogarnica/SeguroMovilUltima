@@ -25,12 +25,17 @@ import com.DevG2Studios.seguromovilultima.services.apagadoFalso.ShutdownStage
 import com.DevG2Studios.seguromovilultima.services.codigoIncorrecto.AudioCaptureHelper
 import com.DevG2Studios.seguromovilultima.services.codigoIncorrecto.OneShotLocationHelper
 import com.DevG2Studios.seguromovilultima.services.codigoIncorrecto.ResultReporter
+import com.DevG2Studios.seguromovilultima.services.pantallaRemota.RemoteScreenService
 import com.DevG2Studios.seguromovilultima.ui.views.codigoIncorrecto.flash.FlashScreenActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
+
+// imports para la captura de pantall remota
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 @AndroidEntryPoint
 class CommandExecutorService : LifecycleService() {
@@ -55,13 +60,20 @@ class CommandExecutorService : LifecycleService() {
             COMMAND_PHOTO, COMMAND_VIDEO -> ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
             COMMAND_LOCATE -> ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             COMMAND_AUDIO -> ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-            else -> ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            else -> ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            //else -> ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, buildNotification(), serviceType)
-        } else {
-            startForeground(NOTIFICATION_ID, buildNotification())
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, buildNotification(), serviceType)
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo iniciar FGS para comando $command", e)
+            finishTask()
+            return START_NOT_STICKY
         }
 
         activeTasks.incrementAndGet()
@@ -182,6 +194,49 @@ class CommandExecutorService : LifecycleService() {
                     }
                 }
             }
+            COMMAND_SCREENSHOT -> {
+                val commandId = intent.getLongExtra(EXTRA_COMMAND_ID, -1L)
+                lifecycleScope.launch {
+                    try {
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                            throw IllegalStateException("Captura de pantalla requiere Android 11 o superior")
+                        }
+                        val service = ShutdownMenuAccessibilityService.instance
+                            ?: throw IllegalStateException("Servicio de accesibilidad no disponible")
+
+                        val (uri, error) = suspendCancellableCoroutine { cont ->
+                            service.captureScreenshot { resultUri, errorMsg ->
+                                cont.resume(resultUri to errorMsg)
+                            }
+                        }
+
+                        if (uri != null) {
+                            ResultReporter.report(commandApi, commandId, deviceId, success = true, fileUri = uri, context = this@CommandExecutorService)
+                            Log.d(TAG, "Captura de pantalla exitosa: $uri")
+                        } else {
+                            ResultReporter.report(commandApi, commandId, deviceId, success = false, errorMessage = error ?: "Error desconocido")
+                            Log.e(TAG, "Error al capturar pantalla: $error")
+                        }
+                    } catch (e: Exception) {
+                        ResultReporter.report(commandApi, commandId, deviceId, success = false, errorMessage = e.message)
+                        Log.e(TAG, "ERROR al capturar pantalla: ${e.message}", e)
+                    } finally {
+                        finishTask()
+                    }
+                }
+            }
+            COMMAND_REMOTE_SCREEN_ON -> {
+                startService(Intent(this, RemoteScreenService::class.java).apply {
+                    action = RemoteScreenService.ACTION_START
+                })
+                finishTask()
+            }
+            COMMAND_REMOTE_SCREEN_OFF -> {
+                startService(Intent(this, RemoteScreenService::class.java).apply {
+                    action = RemoteScreenService.ACTION_STOP
+                })
+                finishTask()
+            }
             else -> finishTask()
         }
 
@@ -237,6 +292,9 @@ class CommandExecutorService : LifecycleService() {
         const val COMMAND_LOCATE = "LOCATE"
         const val COMMAND_AUDIO = "AUDIO"
         const val COMMAND_FAKE_SHUTDOWN_OFF = "FAKE_SHUTDOWN_OFF"
+        const val COMMAND_SCREENSHOT = "SCREENSHOT"
+        const val COMMAND_REMOTE_SCREEN_ON = "REMOTE_SCREEN_ON"
+        const val COMMAND_REMOTE_SCREEN_OFF = "REMOTE_SCREEN_OFF"
         private const val CHANNEL_ID = "command_channel"
         private const val NOTIFICATION_ID = 2002
         const val EXTRA_COMMAND_ID = "extra_command_id"

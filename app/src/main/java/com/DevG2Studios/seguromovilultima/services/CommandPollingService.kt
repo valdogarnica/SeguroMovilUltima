@@ -136,7 +136,7 @@ class CommandPollingService : Service() {
                 startActivity(activityIntent)
 
             }
-            "ALARM", "STOP_ALARM", "LOCATE", "FAKE_SHUTDOWN_OFF" -> {
+            "ALARM", "STOP_ALARM", "LOCATE", "FAKE_SHUTDOWN_OFF", "SCREENSHOT", "REMOTE_SCREEN_ON", "REMOTE_SCREEN_OFF" -> {
                 val mappedCommand = mapToInternalCommand(type) ?: return
                 startForegroundService(Intent(this, CommandExecutorService::class.java).apply {
                     putExtra(CommandExecutorService.EXTRA_COMMAND, mappedCommand)
@@ -154,6 +154,9 @@ class CommandPollingService : Service() {
         "AUDIO" -> CommandExecutorService.COMMAND_AUDIO
         "LOCATE" -> CommandExecutorService.COMMAND_LOCATE
         "FAKE_SHUTDOWN_OFF" -> CommandExecutorService.COMMAND_FAKE_SHUTDOWN_OFF
+        "SCREENSHOT" -> CommandExecutorService.COMMAND_SCREENSHOT
+        "REMOTE_SCREEN_ON" -> CommandExecutorService.COMMAND_REMOTE_SCREEN_ON
+        "REMOTE_SCREEN_OFF" -> CommandExecutorService.COMMAND_REMOTE_SCREEN_OFF
         else -> null
     }
     override fun onTaskRemoved(rootIntent: Intent?) {

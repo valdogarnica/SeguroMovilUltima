@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
@@ -29,7 +31,6 @@
 
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-
 
 
     <uses-feature
@@ -117,11 +118,6 @@
             android:exported="false" />
 
         <service
-            android:name=".services.CommandExecutorService"
-            android:foregroundServiceType="camera|location|dataSync|microphone"
-            android:exported="false" />
-
-        <service
             android:name=".services.apagadoFalso.ShutdownMenuAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="false">
@@ -132,6 +128,23 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+        <!--service
+            android:name=".services.CommandPollingService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" /-->
+        <!--service
+            android:name=".services.CommandExecutorService"
+            android:foregroundServiceType="camera|location|dataSync|microphone"
+            android:exported="false" /-->
+        <service
+            android:name=".services.CommandExecutorService"
+            android:foregroundServiceType="camera|location|microphone|specialUse"
+            android:exported="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Ejecución de comandos remotos de seguridad" />
+        </service>
+
         <service
             android:name=".services.CommandPollingService"
             android:foregroundServiceType="specialUse">
@@ -157,6 +170,11 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <service
+            android:name=".services.pantallaRemota.RemoteScreenService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
 
     </application>
 
