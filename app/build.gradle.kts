@@ -9,11 +9,11 @@ plugins {
 }
 
 android {
-    namespace = "com.DevG2Studios.seguromovilultima"
+    namespace = "com.devg2studios.seguromovilultima"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.DevG2Studios.seguromovilultima"
+        applicationId = "com.devg2studios.seguromovilultima"
         minSdk = 26   // mínimo recomendado: necesitas Foreground Service types de O+
         targetSdk = 35
         versionCode = 1
