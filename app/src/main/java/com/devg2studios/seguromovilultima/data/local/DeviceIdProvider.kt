@@ -10,7 +10,7 @@ import javax.inject.Singleton
 
 @Singleton
 class DeviceIdProvider @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     @SuppressLint("HardwareIds")
     fun getDeviceId(): String {

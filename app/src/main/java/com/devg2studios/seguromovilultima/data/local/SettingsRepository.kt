@@ -32,7 +32,7 @@ data class SecuritySettings(
 
 @Singleton
 class SettingsRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     private object Keys {
         val FAILED_ATTEMPT_DETECTION_ENABLED = booleanPreferencesKey("failed_attempt_detection_enabled")

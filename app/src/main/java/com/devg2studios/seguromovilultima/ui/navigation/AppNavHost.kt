@@ -7,10 +7,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.devg2studios.seguromovilultima.ui.debug.DebugToolsScreen
-import com.devg2studios.seguromovilultima.ui.home.HomeScreen
-import com.devg2studios.seguromovilultima.ui.login.LoginScreen
+import com.devg2studios.seguromovilultima.ui.views.home.HomeScreen
+import com.devg2studios.seguromovilultima.ui.views.auth.login.LoginScreen
 import com.devg2studios.seguromovilultima.ui.views.apagadoFalso.FakeShutdownSettingsScreen
-import com.devg2studios.seguromovilultima.ui.views.auth.RegisterScreen
+import com.devg2studios.seguromovilultima.ui.views.auth.register.RegisterScreen
 import com.devg2studios.seguromovilultima.ui.views.codigoIncorrecto.FailedAttemptSettingsScreen
 import com.devg2studios.seguromovilultima.ui.views.permisos.SetupScreen
 
