@@ -33,6 +33,7 @@ interface CommandApi {
         @Part("deviceId") deviceId: okhttp3.RequestBody,
         @Part("success") success: okhttp3.RequestBody,
         @Part("errorMessage") errorMessage: okhttp3.RequestBody?,
+        @Part("resultData") resultData: okhttp3.RequestBody?,
         @Part file: okhttp3.MultipartBody.Part?
     ): Response<Unit>
 

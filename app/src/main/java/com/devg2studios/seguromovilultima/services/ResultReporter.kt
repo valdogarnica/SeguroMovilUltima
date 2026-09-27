@@ -19,6 +19,7 @@ object ResultReporter {
         success: Boolean,
         errorMessage: String? = null,
         fileUri: Uri? = null,
+        resultData: String? = null,
         context: Context? = null
     ) {
         try {
@@ -47,6 +48,7 @@ object ResultReporter {
                 deviceId = deviceId.toRequestBody("text/plain".toMediaTypeOrNull()),
                 success = success.toString().toRequestBody("text/plain".toMediaTypeOrNull()),
                 errorMessage = errorMessage?.toRequestBody("text/plain".toMediaTypeOrNull()),
+                resultData = resultData?.toRequestBody("text/plain".toMediaTypeOrNull()),
                 file = filePart
             )
 

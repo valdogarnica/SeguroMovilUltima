@@ -158,7 +158,8 @@ class CommandExecutorService : LifecycleService() {
                             deviceId = deviceId,
                             location = LocationReportDto(location.latitude, location.longitude)
                         )
-                        ResultReporter.report(commandApi, commandId, deviceId, success = true)
+                        val coordsText = "%.6f, %.6f".format(location.latitude, location.longitude)
+                        ResultReporter.report(commandApi, commandId, deviceId, success = true, resultData = coordsText)
                     } catch (e: Exception) {
                         ResultReporter.report(commandApi, commandId, deviceId, success = false, errorMessage = e.message)
                         Log.e(TAG, "ERROR al obtener/reportar ubicación: ${e.message}", e)
