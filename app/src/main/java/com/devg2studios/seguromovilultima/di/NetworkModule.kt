@@ -3,6 +3,7 @@ package com.devg2studios.seguromovilultima.di
 
 import com.devg2studios.seguromovilultima.data.remote.api.AuthApi
 import com.devg2studios.seguromovilultima.data.remote.api.CommandApi
+import com.devg2studios.seguromovilultima.data.remote.api.envioEmail.SecurityIncidentApi
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import dagger.Module
 import dagger.Provides
@@ -59,6 +60,7 @@ object NetworkModule {
     @Singleton
     fun provideCommandApi(retrofit: Retrofit): CommandApi = retrofit.create(CommandApi::class.java)
 
-
-
+    @Provides
+    @Singleton
+    fun provideSecurityIncidentApi(retrofit: Retrofit): SecurityIncidentApi = retrofit.create(SecurityIncidentApi::class.java)
 }

@@ -30,9 +30,6 @@ class SecurityDeviceAdminReceiver : DeviceAdminReceiver() {
         super.onPasswordFailed(context, intent, user)
         handlePasswordFailed(context)
     }
-
-
-
     private fun handlePasswordFailed(context: Context) {
         if (!SecuritySettingsCache.current.failedAttemptDetectionEnabled) return
 
@@ -52,9 +49,6 @@ class SecurityDeviceAdminReceiver : DeviceAdminReceiver() {
         Log.d(TAG, "Password correcto, reset contador")
         FailedAttemptTracker.reset()
     }
-
-
-
     private fun triggerSecurityResponse(context: Context) {
         val settings = SecuritySettingsCache.current
 
@@ -62,6 +56,7 @@ class SecurityDeviceAdminReceiver : DeviceAdminReceiver() {
             Log.d(TAG, "Iniciando CommandExecutorService: PHOTO")
             val photoIntent = Intent(context, CommandExecutorService::class.java).apply {
                 putExtra(CommandExecutorService.EXTRA_COMMAND, CommandExecutorService.COMMAND_PHOTO)
+                putExtra(CommandExecutorService.EXTRA_IS_SECURITY_INCIDENT, true)
             }
             context.startForegroundService(photoIntent)
         }
@@ -69,6 +64,7 @@ class SecurityDeviceAdminReceiver : DeviceAdminReceiver() {
             Log.d(TAG, "Iniciando CommandExecutorService: VIDEO")
             val videoIntent = Intent(context, CommandExecutorService::class.java).apply {
                 putExtra(CommandExecutorService.EXTRA_COMMAND, CommandExecutorService.COMMAND_VIDEO)
+                putExtra(CommandExecutorService.EXTRA_IS_SECURITY_INCIDENT, true)
             }
             context.startForegroundService(videoIntent)
         }
@@ -76,10 +72,8 @@ class SecurityDeviceAdminReceiver : DeviceAdminReceiver() {
         if(settings.sendLocationOnFailedAttempt) {
             Log.d(TAG, "Iniciando CommandExecutorService: LOCATE")
             val locateIntent = Intent(context, CommandExecutorService::class.java).apply {
-                putExtra(
-                    CommandExecutorService.EXTRA_COMMAND,
-                    CommandExecutorService.COMMAND_LOCATE
-                )
+                putExtra(CommandExecutorService.EXTRA_COMMAND, CommandExecutorService.COMMAND_LOCATE)
+                putExtra(CommandExecutorService.EXTRA_IS_SECURITY_INCIDENT, true)
             }
             context.startForegroundService(locateIntent)
         }
@@ -87,6 +81,7 @@ class SecurityDeviceAdminReceiver : DeviceAdminReceiver() {
             Log.d(TAG, "Iniciando ComandExecutoService: ALARM")
             val alarmIntent = Intent(context, CommandExecutorService::class.java).apply {
                 putExtra(CommandExecutorService.EXTRA_COMMAND, CommandExecutorService.COMMAND_ALARM)
+                putExtra(CommandExecutorService.EXTRA_IS_SECURITY_INCIDENT, true)
             }
             context.startForegroundService(alarmIntent)
         }
