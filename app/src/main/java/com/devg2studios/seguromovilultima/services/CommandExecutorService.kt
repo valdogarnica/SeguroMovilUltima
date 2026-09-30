@@ -16,6 +16,7 @@ import com.devg2studios.seguromovilultima.data.local.DeviceIdProvider
 import com.devg2studios.seguromovilultima.data.local.SecureTokenStorage
 import com.devg2studios.seguromovilultima.data.local.SecuritySettingsCache
 import com.devg2studios.seguromovilultima.data.remote.api.CommandApi
+import com.devg2studios.seguromovilultima.data.remote.api.envioEmail.SecurityIncidentApi
 import com.devg2studios.seguromovilultima.data.remote.dto.LocationReportDto
 import com.devg2studios.seguromovilultima.service.codigoIncorrecto.VideoCaptureHelper
 import com.devg2studios.seguromovilultima.services.apagadofalso.FakeShutdownActivity
@@ -35,6 +36,9 @@ import javax.inject.Inject
 
 // imports para la captura de pantall remota
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.withLock
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import kotlin.coroutines.resume
 
 @AndroidEntryPoint
@@ -47,6 +51,9 @@ class CommandExecutorService : LifecycleService() {
 
     @Inject
     lateinit var deviceIdProvider: DeviceIdProvider
+
+    @Inject
+    lateinit var incidentApi: SecurityIncidentApi
 
     private val activeTasks = AtomicInteger(0)
 
@@ -93,19 +100,29 @@ class CommandExecutorService : LifecycleService() {
             }
             COMMAND_PHOTO -> {
                 val commandId = intent.getLongExtra(EXTRA_COMMAND_ID, -1L)
+                val isIncident = intent.getBooleanExtra(EXTRA_IS_SECURITY_INCIDENT, false)
                 lifecycleScope.launch {
                     try {
-                        Log.d(TAG, "entrando al comando foto")
                         val uri = PhotoCaptureHelper.captureSilentPhoto(
                             context = this@CommandExecutorService,
                             lifecycleOwner = this@CommandExecutorService,
                             useFrontCamera = true
                         )
-                        Log.d(TAG, "me quede aqui colgdo")
-                        ResultReporter.report(commandApi, commandId, deviceId, success = true, fileUri = uri.toUri(), context = this@CommandExecutorService)
-                        Log.d(TAG, "Foto capturada exitosamente: $uri  commandApi: $commandApi commandId: $commandId deciveID: $deviceId ")
+                        if (isIncident) {
+                            val incidentId = SecurityIncidentCoordinator.getOrCreateIncidentId(
+                                incidentApi, deviceId, SecuritySettingsCache.current
+                            )
+                            if (incidentId != null) {
+                                uploadToIncident(incidentId, uri.toUri(), isVideo = false)
+                                Log.d(TAG, "Foto de incidente subida: $uri")
+                            }
+                        } else {
+                            ResultReporter.report(commandApi, commandId, deviceId, success = true, fileUri = uri.toUri(), context = this@CommandExecutorService)
+                        }
                     } catch (e: Exception) {
-                        ResultReporter.report(commandApi, commandId, deviceId, success = false, errorMessage = e.message)
+                        if (!isIncident) {
+                            ResultReporter.report(commandApi, commandId, deviceId, success = false, errorMessage = e.message)
+                        }
                         Log.e(TAG, "ERROR al capturar foto: ${e.message}", e)
                     } finally {
                         finishTask()
@@ -114,6 +131,7 @@ class CommandExecutorService : LifecycleService() {
             }
             COMMAND_VIDEO -> {
                 val commandId = intent.getLongExtra(EXTRA_COMMAND_ID, -1L)
+                val isIncident = intent.getBooleanExtra(EXTRA_IS_SECURITY_INCIDENT, false)
                 lifecycleScope.launch {
                     try {
                         val uri = VideoCaptureHelper.captureSilentVideo(
@@ -122,10 +140,21 @@ class CommandExecutorService : LifecycleService() {
                             useFrontCamera = true,
                             durationMillis = 10_000L
                         )
-                        ResultReporter.report(commandApi, commandId, deviceId, success = true, fileUri = uri.toUri(), context = this@CommandExecutorService)
-                        Log.d(TAG, "Video capturado exitosamente: $uri")
+                        if (isIncident) {
+                            val incidentId = SecurityIncidentCoordinator.getOrCreateIncidentId(
+                                incidentApi, deviceId, SecuritySettingsCache.current
+                            )
+                            if (incidentId != null) {
+                                uploadToIncident(incidentId, uri.toUri(), isVideo = true)
+                                Log.d(TAG, "Video de incidente subido: $uri")
+                            }
+                        } else {
+                            ResultReporter.report(commandApi, commandId, deviceId, success = true, fileUri = uri.toUri(), context = this@CommandExecutorService)
+                        }
                     } catch (e: Exception) {
-                        ResultReporter.report(commandApi, commandId, deviceId, success = false, errorMessage = e.message)
+                        if (!isIncident) {
+                            ResultReporter.report(commandApi, commandId, deviceId, success = false, errorMessage = e.message)
+                        }
                         Log.e(TAG, "ERROR al capturar video: ${e.message}", e)
                     } finally {
                         finishTask()
@@ -149,19 +178,37 @@ class CommandExecutorService : LifecycleService() {
             }
             COMMAND_LOCATE -> {
                 val commandId = intent.getLongExtra(EXTRA_COMMAND_ID, -1L)
+                val isIncident = intent.getBooleanExtra(EXTRA_IS_SECURITY_INCIDENT, false)
                 lifecycleScope.launch {
                     try {
                         val location = OneShotLocationHelper.getCurrentLocation(this@CommandExecutorService)
                         Log.d(TAG, "Ubicación obtenida: ${location.latitude}, ${location.longitude}")
 
-                        commandApi.reportLocation(
-                            deviceId = deviceId,
-                            location = LocationReportDto(location.latitude, location.longitude)
-                        )
-                        val coordsText = "%.6f, %.6f".format(location.latitude, location.longitude)
-                        ResultReporter.report(commandApi, commandId, deviceId, success = true, resultData = coordsText)
+                        if (isIncident) {
+                            val incidentId = SecurityIncidentCoordinator.getOrCreateIncidentId(
+                                incidentApi, deviceId, SecuritySettingsCache.current
+                            )
+                            if (incidentId != null) {
+                                incidentApi.reportLocation(
+                                    incidentId,
+                                    com.devg2studios.seguromovilultima.data.remote.dto.envioEmail.IncidentLocationDto(
+                                        location.latitude, location.longitude
+                                    )
+                                )
+                                Log.d(TAG, "Ubicación de incidente reportada")
+                            }
+                        } else {
+                            commandApi.reportLocation(
+                                deviceId = deviceId,
+                                location = LocationReportDto(location.latitude, location.longitude)
+                            )
+                            val coordsText = "%.6f, %.6f".format(location.latitude, location.longitude)
+                            ResultReporter.report(commandApi, commandId, deviceId, success = true, resultData = coordsText)
+                        }
                     } catch (e: Exception) {
-                        ResultReporter.report(commandApi, commandId, deviceId, success = false, errorMessage = e.message)
+                        if (!isIncident) {
+                            ResultReporter.report(commandApi, commandId, deviceId, success = false, errorMessage = e.message)
+                        }
                         Log.e(TAG, "ERROR al obtener/reportar ubicación: ${e.message}", e)
                     } finally {
                         finishTask()
@@ -283,6 +330,16 @@ class CommandExecutorService : LifecycleService() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
+    private suspend fun uploadToIncident(incidentId: Long, uri: android.net.Uri, isVideo: Boolean) {
+        val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
+        val mimeType = if (isVideo) "video/mp4" else "image/jpeg"
+        val fileName = if (isVideo) "incident.mp4" else "incident.jpg"
+        val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+        val filePart = okhttp3.MultipartBody.Part.createFormData("file", fileName, requestBody)
+        val deviceIdPart = deviceId.toRequestBody("text/plain".toMediaTypeOrNull())
+        if (isVideo) incidentApi.reportVideo(incidentId, deviceIdPart, filePart)
+        else incidentApi.reportPhoto(incidentId, deviceIdPart, filePart)
+    }
     companion object {
         private const val TAG = "COMMAND_EXECUTOR"
         const val EXTRA_COMMAND = "extra_command"
@@ -299,5 +356,36 @@ class CommandExecutorService : LifecycleService() {
         private const val CHANNEL_ID = "command_channel"
         private const val NOTIFICATION_ID = 2002
         const val EXTRA_COMMAND_ID = "extra_command_id"
+        const val EXTRA_IS_SECURITY_INCIDENT = "extra_is_security_incident"
+    }
+}
+
+private object SecurityIncidentCoordinator {
+    private val mutex = kotlinx.coroutines.sync.Mutex()
+    private var currentIncidentId: Long? = null
+    private var createdAtMs: Long = 0L
+    private const val WINDOW_MS = 15_000L // ventana para agrupar foto+video+ubicación del mismo evento
+
+    suspend fun getOrCreateIncidentId(
+        api: SecurityIncidentApi,
+        deviceId: String,
+        settings: com.devg2studios.seguromovilultima.data.local.SecuritySettings
+    ): Long? = mutex.withLock {
+        val now = System.currentTimeMillis()
+        if (currentIncidentId != null && now - createdAtMs < WINDOW_MS) {
+            return@withLock currentIncidentId
+        }
+        val response = api.startIncident(
+            deviceId,
+            com.devg2studios.seguromovilultima.data.remote.dto.envioEmail.StartIncidentDto(
+                photoExpected = settings.sendPhotoOnFailedAttempt,
+                videoExpected = settings.sendVideoOnFailedAttempt,
+                locationExpected = settings.sendLocationOnFailedAttempt,
+                alarmTriggered = settings.startAlarmOnFailedAttempt
+            )
+        )
+        currentIncidentId = if (response.isSuccessful) response.body()?.incidentId else null
+        createdAtMs = now
+        currentIncidentId
     }
 }
