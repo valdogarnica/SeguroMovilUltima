@@ -14,6 +14,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
@@ -34,9 +35,18 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            // BODY intenta leer y loguear el cuerpo completo de cada petición,
+            // lo cual para un archivo multipart de varios MB (foto/video) es
+            // costoso y añade latencia innecesaria — HEADERS evita eso sin
+            // perder visibilidad útil para depurar.
+            level = HttpLoggingInterceptor.Level.HEADERS
         }
         return OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)   // tiempo para subir el archivo
+            .readTimeout(60, TimeUnit.SECONDS)    // tiempo para esperar la respuesta del backend
+            .callTimeout(90, TimeUnit.SECONDS)    // límite total de la llamada completa
+            .retryOnConnectionFailure(true)
             .addInterceptor(logging)
             .build()
     }

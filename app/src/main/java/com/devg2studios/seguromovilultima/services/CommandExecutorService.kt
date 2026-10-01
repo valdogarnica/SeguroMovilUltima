@@ -40,6 +40,7 @@ import kotlinx.coroutines.sync.withLock
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import kotlin.coroutines.resume
+import kotlin.time.Duration.Companion.milliseconds
 
 @AndroidEntryPoint
 class CommandExecutorService : LifecycleService() {
@@ -102,11 +103,13 @@ class CommandExecutorService : LifecycleService() {
                 val commandId = intent.getLongExtra(EXTRA_COMMAND_ID, -1L)
                 val isIncident = intent.getBooleanExtra(EXTRA_IS_SECURITY_INCIDENT, false)
                 lifecycleScope.launch {
+                    var uri: String? = null
                     try {
-                        val uri = PhotoCaptureHelper.captureSilentPhoto(
+                        uri = PhotoCaptureHelper.captureSilentPhoto(
                             context = this@CommandExecutorService,
                             lifecycleOwner = this@CommandExecutorService,
-                            useFrontCamera = true
+                            useFrontCamera = true,
+                            saveToGallery = false
                         )
                         if (isIncident) {
                             val incidentId = SecurityIncidentCoordinator.getOrCreateIncidentId(
@@ -125,6 +128,9 @@ class CommandExecutorService : LifecycleService() {
                         }
                         Log.e(TAG, "ERROR al capturar foto: ${e.message}", e)
                     } finally {
+                        uri?.let {
+                            PhotoCaptureHelper.deleteTempFile(this@CommandExecutorService, it)
+                        }
                         finishTask()
                     }
                 }
@@ -133,12 +139,14 @@ class CommandExecutorService : LifecycleService() {
                 val commandId = intent.getLongExtra(EXTRA_COMMAND_ID, -1L)
                 val isIncident = intent.getBooleanExtra(EXTRA_IS_SECURITY_INCIDENT, false)
                 lifecycleScope.launch {
+                    var uri: String? = null
                     try {
-                        val uri = VideoCaptureHelper.captureSilentVideo(
+                        uri = VideoCaptureHelper.captureSilentVideo(
                             context = this@CommandExecutorService,
                             lifecycleOwner = this@CommandExecutorService,
                             useFrontCamera = true,
-                            durationMillis = 10_000L
+                            durationMillis = 10_000L,
+                            saveToGallery = false
                         )
                         if (isIncident) {
                             val incidentId = SecurityIncidentCoordinator.getOrCreateIncidentId(
@@ -154,9 +162,13 @@ class CommandExecutorService : LifecycleService() {
                     } catch (e: Exception) {
                         if (!isIncident) {
                             ResultReporter.report(commandApi, commandId, deviceId, success = false, errorMessage = e.message)
+                            Log.d(TAG, "Audio capturado exitosamente: $uri")
                         }
                         Log.e(TAG, "ERROR al capturar video: ${e.message}", e)
                     } finally {
+                        uri?.let {
+                            VideoCaptureHelper.deleteTempFile(this@CommandExecutorService, it)
+                        }
                         finishTask()
                     }
                 }
@@ -164,14 +176,22 @@ class CommandExecutorService : LifecycleService() {
             COMMAND_AUDIO -> {
                 val commandId = intent.getLongExtra(EXTRA_COMMAND_ID, -1L)
                 lifecycleScope.launch {
+                    var uri: String? = null
                     try {
-                        val uri = AudioCaptureHelper.captureSilentAudio(context = this@CommandExecutorService, durationMillis = 10_000L)
+                        uri = AudioCaptureHelper.captureSilentAudio(
+                            context = this@CommandExecutorService,
+                            durationMillis = 10_000L,
+                            saveToGallery = false
+                        )
                         ResultReporter.report(commandApi, commandId, deviceId, success = true, fileUri = uri.toUri(), context = this@CommandExecutorService)
                         Log.d(TAG, "Audio capturado exitosamente: $uri")
                     } catch (e: Exception) {
                         ResultReporter.report(commandApi, commandId, deviceId, success = false, errorMessage = e.message)
                         Log.e(TAG, "ERROR al capturar audio: ${e.message}", e)
                     } finally {
+                        uri?.let {
+                            AudioCaptureHelper.deleteTempFile(this@CommandExecutorService, it)
+                        }
                         finishTask()
                     }
                 }
@@ -300,7 +320,7 @@ class CommandExecutorService : LifecycleService() {
 
     private fun stopAlarmAfterDelay() {
         lifecycleScope.launch {
-            delay(30_000)
+            delay(30_000.milliseconds)
             AlarmHelper.stopAlarm(this@CommandExecutorService)
             finishTask()
         }
