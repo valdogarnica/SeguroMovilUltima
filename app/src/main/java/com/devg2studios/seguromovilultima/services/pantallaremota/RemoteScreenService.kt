@@ -23,12 +23,17 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.coroutines.resume
 import androidx.core.graphics.scale
+import com.devg2studios.seguromovilultima.di.BaseUrl
 
 @AndroidEntryPoint
 class RemoteScreenService : Service() {
 
     @Inject
     lateinit var tokenStorage: SecureTokenStorage
+
+    @Inject
+    @BaseUrl
+    lateinit var baseUrl: String
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private var captureJob: Job? = null
@@ -43,11 +48,19 @@ class RemoteScreenService : Service() {
         private const val NOTIFICATION_ID = 4001
         private const val FRAME_INTERVAL_MS = 400L
         // TODO: cambia al host real de tu backend cuando despliegues
-        private const val WS_URL = "ws://192.168.1.12:8081/ws"
+        //private const val WS_URL = "ws://192.168.1.12:8081/ws"
 
         const val ACTION_START = "action_start"
         const val ACTION_STOP = "action_stop"
 
+    }
+    private fun buildWsUrl(): String {
+        // https:// -> wss://   |   http:// -> ws://
+        val wsBase = baseUrl
+            .replace("https://", "wss://")
+            .replace("http://", "ws://")
+            .trimEnd('/')
+        return "$wsBase/ws"
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -66,7 +79,7 @@ class RemoteScreenService : Service() {
             .readTimeout(0, TimeUnit.MILLISECONDS) // sin timeout, es un socket persistente
             .build()
 
-        stompClient = StompOverWebSocketClient(client, WS_URL).apply {
+        stompClient = StompOverWebSocketClient(client, buildWsUrl()).apply {
             connect {
                 Log.d(TAG, "Conectado, suscribiendo canales")
                 subscribe("/topic/touch/$deviceId") { body ->

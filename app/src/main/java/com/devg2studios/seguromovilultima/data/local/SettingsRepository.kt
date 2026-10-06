@@ -27,7 +27,11 @@ data class SecuritySettings(
 
     val fakeShutdownSendPhoto: Boolean = true,
     val fakeShutdownSendVideo: Boolean = false,
-    val fakeShutdownSendLocation: Boolean = true
+    val fakeShutdownSendLocation: Boolean = true,
+
+    // backup fotos
+    val mediaBackupEnabled: Boolean = false,
+    val mediaBackupWifiOnly: Boolean = true
 )
 
 @Singleton
@@ -50,6 +54,10 @@ class SettingsRepository @Inject constructor(
         val FAKE_SHUTDOWN_SEND_PHOTO = booleanPreferencesKey("fake_shutdown_send_photo")
         val FAKE_SHUTDOWN_SEND_VIDEO = booleanPreferencesKey("fake_shutdown_send_video")
         val FAKE_SHUTDOWN_SEND_LOCATION = booleanPreferencesKey("fake_shutdown_send_location")
+
+        // backup fotos
+        val MEDIA_BACKUP_ENABLED = booleanPreferencesKey("media_backup_enabled")
+        val MEDIA_BACKUP_WIFI_ONLY = booleanPreferencesKey("media_backup_wifi_only")
     }
 
     val settingsFlow: Flow<SecuritySettings> = context.dataStore.data.map { prefs ->
@@ -68,7 +76,11 @@ class SettingsRepository @Inject constructor(
             fakeShutdownEnabled = prefs[Keys.FAKE_SHUTDOWN_ENABLED] ?: false,
             fakeShutdownSendPhoto = prefs[Keys.FAKE_SHUTDOWN_SEND_PHOTO] ?: true,
             fakeShutdownSendVideo = prefs[Keys.FAKE_SHUTDOWN_SEND_VIDEO] ?: false,
-            fakeShutdownSendLocation = prefs[Keys.FAKE_SHUTDOWN_SEND_LOCATION] ?: true
+            fakeShutdownSendLocation = prefs[Keys.FAKE_SHUTDOWN_SEND_LOCATION] ?: true,
+
+            // backup fotos
+            mediaBackupEnabled = prefs[Keys.MEDIA_BACKUP_ENABLED] ?: false,
+            mediaBackupWifiOnly = prefs[Keys.MEDIA_BACKUP_WIFI_ONLY] ?: true
         )
     }
     suspend fun setFailedAttemptDetectionEnabled(enabled: Boolean) {
@@ -113,6 +125,14 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setFakeShutdownSendLocation(enabled: Boolean) {
         context.dataStore.edit { it[Keys.FAKE_SHUTDOWN_SEND_LOCATION] = enabled }
+    }
+    // backup fotos
+    suspend fun setMediaBackupEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.MEDIA_BACKUP_ENABLED] = enabled }
+    }
+
+    suspend fun setMediaBackupWifiOnly(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.MEDIA_BACKUP_WIFI_ONLY] = enabled }
     }
 }
 
