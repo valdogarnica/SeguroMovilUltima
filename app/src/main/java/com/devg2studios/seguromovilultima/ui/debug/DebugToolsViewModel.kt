@@ -18,4 +18,15 @@ class DebugToolsViewModel @Inject constructor(
             settingsRepository.setLocationTrackingEnabled(enabled)
         }
     }
+    fun setMediaBackupEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setMediaBackupEnabled(enabled)
+        }
+    }
+
+    fun setMediaBackupWifiOnly(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setMediaBackupWifiOnly(enabled)
+        }
+    }
 }

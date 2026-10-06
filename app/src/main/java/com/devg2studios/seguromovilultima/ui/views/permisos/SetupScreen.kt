@@ -44,6 +44,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.devg2studios.seguromovilultima.services.backup.MediaBackupService
 import com.devg2studios.seguromovilultima.utils.ServiceUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -140,6 +141,15 @@ fun SetupScreen(
                 isPermissionGranted(context, Manifest.permission.POST_NOTIFICATIONS)
             else true
         )
+    }
+    // --- Permiso de medios para el respaldo de fotos/videos ---
+    var hasMediaPermission by remember {
+        mutableStateOf(hasMediaReadPermission(context))
+    }
+    val mediaPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        hasMediaPermission = results.values.all { it }
     }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -400,7 +410,18 @@ fun SetupScreen(
                     }
                 }
             )
-
+            Spacer(modifier = Modifier.height(10.dp))
+            PermissionCard(
+                title = "Acceso a fotos y videos",
+                description = "Necesario para respaldar tu galería, incluyendo WhatsApp y otras apps",
+                isGranted = hasMediaPermission,
+                accentColor = Color(0xFFFFA726),
+                onClick = {
+                    if (!hasMediaPermission) {
+                        mediaPermissionLauncher.launch(mediaPermissionsToRequest())
+                    }
+                }
+            )
             Spacer(modifier = Modifier.height(24.dp))
             SectionHeader("Apagado falso", Color(0xFF5C6BC0))
 
@@ -477,6 +498,60 @@ fun SetupScreen(
                     }
                 }
             )
+            // botones para fotos
+            Spacer(modifier = Modifier.height(24.dp))
+            SectionHeader("Copia de seguridad de fotos", Color(0xFF26A69A))
+
+            var mediaBackupEnabled by remember {
+                mutableStateOf(com.devg2studios.seguromovilultima.data.local.SecuritySettingsCache.current.mediaBackupEnabled)
+            }
+            var mediaBackupWifiOnly by remember {
+                mutableStateOf(com.devg2studios.seguromovilultima.data.local.SecuritySettingsCache.current.mediaBackupWifiOnly)
+            }
+
+            ProtectionToggleCard(
+                isActive = mediaBackupEnabled,
+                enabled = hasMediaPermission,
+                onCheckedChange = { checked ->
+                    if(!hasMediaPermission) return@ProtectionToggleCard
+                    mediaBackupEnabled = checked
+                    viewModel.setMediaBackupEnabled(checked)
+                    if (checked) {
+                        context.startForegroundService(
+                            Intent(context, MediaBackupService::class.java)
+                        )
+                    } else {
+                        context.stopService(Intent(context, MediaBackupService::class.java))
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Solo con Wi-Fi",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Evita gastar datos móviles al respaldar fotos y videos",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = mediaBackupWifiOnly,
+                    onCheckedChange = { checked ->
+                        mediaBackupWifiOnly = checked
+                        viewModel.setMediaBackupWifiOnly(checked)
+                    },
+                    enabled = mediaBackupEnabled
+                )
+            }
 
             if (isXiaomi) {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -865,4 +940,20 @@ private fun isAccessibilityServiceEnabled(context: Context): Boolean {
 
     val colonSplitter = enabledServices.split(":")
     return colonSplitter.any { it.equals(expectedComponentName, ignoreCase = true) }
+}
+private fun hasMediaReadPermission(context: Context): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        isPermissionGranted(context, Manifest.permission.READ_MEDIA_IMAGES) &&
+                isPermissionGranted(context, Manifest.permission.READ_MEDIA_VIDEO)
+    } else {
+        isPermissionGranted(context, Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
+}
+
+private fun mediaPermissionsToRequest(): Array<String> {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+    } else {
+        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
 }

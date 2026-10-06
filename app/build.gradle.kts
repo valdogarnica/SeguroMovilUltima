@@ -82,7 +82,14 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
 
 
-    // build.gradle (app)
+    // Room
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+
+    // Hilt + WorkManager
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
 
 
 
