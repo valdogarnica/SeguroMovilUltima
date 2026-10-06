@@ -24,6 +24,7 @@ import javax.inject.Inject
 import kotlin.coroutines.resume
 import androidx.core.graphics.scale
 import com.devg2studios.seguromovilultima.di.BaseUrl
+import kotlin.time.Duration.Companion.milliseconds
 
 @AndroidEntryPoint
 class RemoteScreenService : Service() {
@@ -108,7 +109,7 @@ class RemoteScreenService : Service() {
                 } else {
                     Log.w(TAG, "Android < 11, captura de pantalla no soportada")
                 }
-                delay(FRAME_INTERVAL_MS)
+                delay(FRAME_INTERVAL_MS.milliseconds)
             }
         }
     }
