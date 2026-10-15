@@ -1,7 +1,10 @@
 package com.devg2studios.seguromovilultima.services.backup
 
+import android.content.ContentResolver
 import android.content.Context
+import android.os.Build
 import android.provider.MediaStore
+import androidx.core.os.bundleOf
 
 data class ScannedMediaItem(
     val mediaStoreId: Long,
@@ -16,7 +19,8 @@ object MediaItemScanner {
 
     /**
      * Consulta MediaStore.Files filtrando solo imágenes y videos — esto
-     * incluye todo lo indexado por el sistema: cámara, capturas de
+     * incluye
+     * lo que está indexado en la
      * pantalla, WhatsApp Images/Video, Snapchat, Telegram, etc., ya que
      * todas esas apps guardan sus archivos a través de MediaStore desde
      * Android 10 en adelante (scoped storage).
@@ -32,30 +36,46 @@ object MediaItemScanner {
             MediaStore.Files.FileColumns.MEDIA_TYPE
         )
 
-        val selection = "${MediaStore.Files.FileColumns.MEDIA_TYPE} = ? OR ${MediaStore.Files.FileColumns.MEDIA_TYPE} = ?"
-        val selectionArgs = arrayOf(
-            MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
-            MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString()
-        )
-
         val queryUri = MediaStore.Files.getContentUri("external")
 
-        context.contentResolver.query(
-            queryUri, projection, selection, selectionArgs,
-            "${MediaStore.Files.FileColumns.DATE_ADDED} DESC"
-        )?.use { cursor ->
-            val idCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
-            val mimeCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MIME_TYPE)
-            val folderCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME)
-            val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_ADDED)
-            val typeCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE)
+        val cursor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val queryArgs = bundleOf(
+                ContentResolver.QUERY_ARG_SQL_SELECTION to
+                        "${MediaStore.Files.FileColumns.MEDIA_TYPE} = ? OR ${MediaStore.Files.FileColumns.MEDIA_TYPE} = ?",
+                ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS to arrayOf(
+                    MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
+                    MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString()
+                ),
+                ContentResolver.QUERY_ARG_SQL_SORT_ORDER to "${MediaStore.Files.FileColumns.DATE_ADDED} DESC",
+                // sin esto, MediaStore oculta por defecto lo que está en la papelera
+                MediaStore.QUERY_ARG_MATCH_TRASHED to MediaStore.MATCH_INCLUDE
+            )
+            context.contentResolver.query(queryUri, projection, queryArgs, null)
+        } else {
+            val selection = "${MediaStore.Files.FileColumns.MEDIA_TYPE} = ? OR ${MediaStore.Files.FileColumns.MEDIA_TYPE} = ?"
+            val selectionArgs = arrayOf(
+                MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
+                MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString()
+            )
+            context.contentResolver.query(
+                queryUri, projection, selection, selectionArgs,
+                "${MediaStore.Files.FileColumns.DATE_ADDED} DESC"
+            )
+        }
 
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idCol)
-                val mimeType = cursor.getString(mimeCol) ?: "application/octet-stream"
-                val folder = cursor.getString(folderCol) ?: "Otros"
-                val dateAddedSeconds = cursor.getLong(dateCol)
-                val isVideo = cursor.getInt(typeCol) == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO
+        cursor?.use { c ->
+            val idCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
+            val mimeCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MIME_TYPE)
+            val folderCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.BUCKET_DISPLAY_NAME)
+            val dateCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_ADDED)
+            val typeCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE)
+
+            while (c.moveToNext()) {
+                val id = c.getLong(idCol)
+                val mimeType = c.getString(mimeCol) ?: "application/octet-stream"
+                val folder = c.getString(folderCol) ?: "Otros"
+                val dateAddedSeconds = c.getLong(dateCol)
+                val isVideo = c.getInt(typeCol) == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO
 
                 val contentUri = if (isVideo) {
                     android.content.ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)

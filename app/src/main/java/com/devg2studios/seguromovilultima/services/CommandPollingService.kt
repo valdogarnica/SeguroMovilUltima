@@ -6,7 +6,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
@@ -21,6 +20,7 @@ import com.devg2studios.seguromovilultima.data.local.SecureTokenStorage
 import com.devg2studios.seguromovilultima.data.remote.api.CommandApi
 import com.devg2studios.seguromovilultima.data.remote.service.CameraTriggerActivity
 import com.devg2studios.seguromovilultima.receivers.PollingWatchdogScheduler
+import com.devg2studios.seguromovilultima.services.notification.PersistentNotificationManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,18 +28,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 @AndroidEntryPoint
 class CommandPollingService : Service() {
-
     @Inject
     lateinit var commandApi: CommandApi
-
     @Inject
     lateinit var tokenStorage: SecureTokenStorage
-
-    //private val mideviceId: String get() = tokenStorage.getToken() ?: "unknown-device"
-
     @Inject
     lateinit var devideIdProvider: DeviceIdProvider
     private val mideviceId: String get() = devideIdProvider.getDeviceId()
@@ -51,9 +47,8 @@ class CommandPollingService : Service() {
         private const val TAG = "COMMAND_POLLING"
         private const val POLL_INTERVAL_MS = 10_000L
         private const val WAKE_LOCK_TIMEOUT_MS = 15_000L
-
         private const val CHANNEL_ID = "command_polling_channel"
-        private const val NOTIFICATION_ID = 3001
+        //private const val NOTIFICATION_ID = 3001
     }
     override fun onTimeout(startId: Int, fgsType: Int) {  // API 35+
         stopSelf()
@@ -61,10 +56,11 @@ class CommandPollingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
-            ServiceCompat.startForeground(
-                this, NOTIFICATION_ID, buildNotification(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            )
+            //ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(),ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            ServiceCompat.startForeground(this,
+                PersistentNotificationManager.NOTIFICATION_ID,
+                PersistentNotificationManager.build(this),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo iniciar FGS", e)
             PollingWatchdogScheduler.scheduleNext(this) // que el watchdog siga intentando
@@ -83,11 +79,11 @@ class CommandPollingService : Service() {
         )
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("SeguroMovilUltima")
-            .setContentText("Sincronizando con el servidor")
+            .setContentTitle("Seguro-Movil")
+            .setContentText("sincronizando con el servidor")
             .setSmallIcon(R.drawable.baseline_bolt_24)
             .setPriority(NotificationCompat.PRIORITY_MIN)
-            .setOngoing(true)                 // no deslizable en la mayoría de casos
+            .setOngoing(true)
             .setAutoCancel(false)
             .build()
     }
@@ -96,7 +92,7 @@ class CommandPollingService : Service() {
         if (pollingJob?.isActive == true) return
         pollingJob = scope.launch {
             while (true) {
-                val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+                val powerManager = getSystemService(POWER_SERVICE) as PowerManager
                 val wakeLock = powerManager.newWakeLock(
                     PowerManager.PARTIAL_WAKE_LOCK, "SeguroMovil:PollingWakeLock"
                 )
@@ -119,7 +115,7 @@ class CommandPollingService : Service() {
                 } finally {
                     if (wakeLock.isHeld) wakeLock.release()
                 }
-                delay(POLL_INTERVAL_MS)
+                delay(POLL_INTERVAL_MS.milliseconds)
             }
         }
     }

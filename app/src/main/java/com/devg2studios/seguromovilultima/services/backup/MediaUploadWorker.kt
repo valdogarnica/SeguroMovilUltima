@@ -47,7 +47,7 @@ class MediaUploadWorker @AssistedInject constructor(
         const val KEY_MIME_TYPE = "mime_type"
         const val KEY_TAKEN_AT = "taken_at"
 
-        // 45MB por parte: margen cómodo bajo el límite de 500MB del backend.
+        // 45 MB por parte: margen cómodo bajo el límite de 500 MB del backend.
         private const val CHUNK_SIZE = 45L * 1024 * 1024
         // Videos por debajo de esto se suben de una sola vez, como las fotos.
         private const val VIDEO_CHUNK_THRESHOLD = 90L * 1024 * 1024
@@ -68,7 +68,7 @@ class MediaUploadWorker @AssistedInject constructor(
         }
 
         if (wifiOnly && !isConnectedToWifi(applicationContext)) {
-            Log.d("MEDIA_BACKUP", "wifiOnly=true pero no hay Wi-Fi real activa, reintentando más tarde")
+            Log.d("MEDIA_BACKUP", "wifiOnly=$wifiOnly pero no hay Wi-Fi real activa, reintentando más tarde")
             return Result.retry() // sigue en la cola, no libera el hueco
         }
 
@@ -198,7 +198,7 @@ class MediaUploadWorker @AssistedInject constructor(
                 val nombreParte = "video_${mediaStoreId}_parte${parte}_de_${totalPartes}.mp4"
                 val filePart = MultipartBody.Part.createFormData("file", nombreParte, chunkRequestBody)
 
-                Log.d("MEDIA_BACKUP", "Subiendo parte $parte/$totalPartes de mediaStoreId=$mediaStoreId ($tamanoParte bytes)")
+                Log.d("MEDIA_BACKUP", "subiendo parte $parte/$totalPartes de mediaStoreId=$mediaStoreId ($tamanoParte bytes)")
 
                 val response = api.uploadBackupChunk(
                     deviceId = deviceId,

@@ -26,6 +26,7 @@ import com.devg2studios.seguromovilultima.services.apagadofalso.ShutdownStage
 import com.devg2studios.seguromovilultima.services.codigoIncorrecto.AudioCaptureHelper
 import com.devg2studios.seguromovilultima.services.codigoIncorrecto.OneShotLocationHelper
 import com.devg2studios.seguromovilultima.services.codigoIncorrecto.ResultReporter
+import com.devg2studios.seguromovilultima.services.notification.PersistentNotificationManager
 import com.devg2studios.seguromovilultima.services.pantallaremota.RemoteScreenService
 import com.devg2studios.seguromovilultima.ui.views.codigoIncorrecto.flash.FlashScreenActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -74,9 +75,11 @@ class CommandExecutorService : LifecycleService() {
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID, buildNotification(), serviceType)
+                startForeground(PersistentNotificationManager.NOTIFICATION_ID,
+                    PersistentNotificationManager.build(this), serviceType)
             } else {
-                startForeground(NOTIFICATION_ID, buildNotification())
+                startForeground(PersistentNotificationManager.NOTIFICATION_ID,
+                    PersistentNotificationManager.build(this))
             }
         } catch (e: Exception) {
             Log.w(TAG, "No se pudo iniciar FGS para comando $command", e)

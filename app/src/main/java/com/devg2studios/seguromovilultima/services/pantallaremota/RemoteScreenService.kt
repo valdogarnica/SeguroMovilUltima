@@ -24,6 +24,7 @@ import javax.inject.Inject
 import kotlin.coroutines.resume
 import androidx.core.graphics.scale
 import com.devg2studios.seguromovilultima.di.BaseUrl
+import com.devg2studios.seguromovilultima.services.notification.PersistentNotificationManager
 import kotlin.time.Duration.Companion.milliseconds
 
 @AndroidEntryPoint
@@ -48,9 +49,6 @@ class RemoteScreenService : Service() {
         private const val CHANNEL_ID = "remote_screen_channel"
         private const val NOTIFICATION_ID = 4001
         private const val FRAME_INTERVAL_MS = 400L
-        // TODO: cambia al host real de tu backend cuando despliegues
-        //private const val WS_URL = "ws://192.168.1.12:8081/ws"
-
         const val ACTION_START = "action_start"
         const val ACTION_STOP = "action_stop"
 
@@ -73,7 +71,8 @@ class RemoteScreenService : Service() {
     }
 
     private fun startStreaming() {
-        startForeground(NOTIFICATION_ID, buildNotification())
+        //startForeground(NOTIFICATION_ID, buildNotification())
+        startForeground(PersistentNotificationManager.NOTIFICATION_ID, PersistentNotificationManager.build(this))
         val deviceId = tokenStorage.getToken() ?: return
 
         val client = OkHttpClient.Builder()
@@ -185,7 +184,6 @@ class RemoteScreenService : Service() {
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("SeguroMovilUltima")
             .setContentText("Transmitiendo pantalla")
             .setSmallIcon(R.mipmap.ic_launcher)
             .build()

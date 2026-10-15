@@ -17,7 +17,7 @@ class MediaBackupScanner @Inject constructor(
 ) {
     companion object {
         // Muy por debajo del límite de 100 jobs simultáneos que impone Android.
-        private const val MAX_CONCURRENT_JOBS = 15
+        private const val MAX_CONCURRENT_JOBS = 20
     }
 
     suspend fun scanAndEnqueuePending(wifiOnly: Boolean) {

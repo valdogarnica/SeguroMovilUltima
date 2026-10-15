@@ -1,14 +1,17 @@
 package com.devg2studios.seguromovilultima.services.backup
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.database.ContentObserver
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -17,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import com.devg2studios.seguromovilultima.R
 import com.devg2studios.seguromovilultima.data.local.SecuritySettingsCache
 import com.devg2studios.seguromovilultima.data.local.backup.SyncedMediaDao
+import com.devg2studios.seguromovilultima.services.notification.PersistentNotificationManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -49,9 +53,10 @@ class MediaBackupService : LifecycleService() {
         Log.d(TAG, "onStartCommand llamado")
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                //startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                startForeground(PersistentNotificationManager.NOTIFICATION_ID, PersistentNotificationManager.build(this), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
             } else {
-                startForeground(NOTIFICATION_ID, buildNotification())
+                startForeground(PersistentNotificationManager.NOTIFICATION_ID, PersistentNotificationManager.build(this))
             }
             Log.d(TAG, "startForeground exitoso")
         } catch (e: Exception) {
@@ -63,6 +68,7 @@ class MediaBackupService : LifecycleService() {
         registerObserverIfNeeded()
         lifecycleScope.launch {
             val wifiOnly = SecuritySettingsCache.current.mediaBackupWifiOnly
+            WhatsAppMediaIndexer.indexPrivateMedia(applicationContext)
             scanner.resetQueueAndScan(wifiOnly) // limpia huérfanos y vuelve a escanear
         }
         return START_STICKY
@@ -113,5 +119,25 @@ class MediaBackupService : LifecycleService() {
     override fun onDestroy() {
         super.onDestroy()
         observer?.let { contentResolver.unregisterContentObserver(it) }
+    }
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.d(TAG, "Tarea removida, reprogramando reinicio de MediaBackupService")
+
+        val restartIntent = Intent(applicationContext, MediaBackupService::class.java).apply {
+            setPackage(packageName)
+        }
+
+        val pendingIntent = PendingIntent.getService(
+            this, 2, restartIntent,  // request code distinto al de CommandPollingService (usa 1)
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+        alarmManager.set(
+            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+            SystemClock.elapsedRealtime() + 1000,
+            pendingIntent
+        )
     }
 }

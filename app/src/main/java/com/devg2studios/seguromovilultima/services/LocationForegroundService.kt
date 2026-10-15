@@ -12,6 +12,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.devg2studios.seguromovilultima.MainActivity
 import com.devg2studios.seguromovilultima.R
+import com.devg2studios.seguromovilultima.services.notification.PersistentNotificationManager
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -50,8 +51,8 @@ class LocationForegroundService : Service() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
-                NOTIFICATION_ID,
-                notification,
+                PersistentNotificationManager.NOTIFICATION_ID,
+                PersistentNotificationManager.build(this),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             )
         } else {

@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Environment
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -46,6 +47,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.devg2studios.seguromovilultima.services.backup.MediaBackupService
 import com.devg2studios.seguromovilultima.utils.ServiceUtils
+import androidx.core.content.edit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -246,6 +248,12 @@ fun SetupScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             SectionHeader("Protección", Color(0xFF26A69A))
+            var mediaBackupEnabled by remember {
+                mutableStateOf(com.devg2studios.seguromovilultima.data.local.SecuritySettingsCache.current.mediaBackupEnabled)
+            }
+            var mediaBackupWifiOnly by remember {
+                mutableStateOf(com.devg2studios.seguromovilultima.data.local.SecuritySettingsCache.current.mediaBackupWifiOnly)
+            }
 
             ProtectionToggleCard(
                 isActive = isProtectionActive,
@@ -255,15 +263,52 @@ fun SetupScreen(
                     val prefs = context.getSharedPreferences("app_state", Context.MODE_PRIVATE)
                     if (checked) {
                         context.startForegroundService(Intent(context, LocationForegroundService::class.java))
-                        prefs.edit().putBoolean("protection_enabled", true).apply()
+                        prefs.edit { putBoolean("protection_enabled", true) }
                     } else {
                         context.stopService(Intent(context, LocationForegroundService::class.java))
-                        prefs.edit().putBoolean("protection_enabled", false).apply()
+                        prefs.edit { putBoolean("protection_enabled", false) }
                     }
                     isProtectionActive = checked
                     viewModel.setLocationTrackingEnabled(checked)
+
+                    // AQUI LA COPIA DE SEGURIDAD
+                    if(hasMediaPermission) {
+                        mediaBackupEnabled = checked
+                        viewModel.setMediaBackupEnabled(checked)
+                        if (checked) {
+                            context.startForegroundService(Intent(context, MediaBackupService::class.java))
+                        } else {
+                            context.stopService(Intent(context, MediaBackupService::class.java))
+                        }
+                    }
                 }
             )
+            // botones para fotos usando datos moviles o wifi
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Wi-Fi y datos móviles",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    //Text(
+                    //    text = "",
+                    //    style = MaterialTheme.typography.bodySmall,
+                    //    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    //)
+                }
+                Switch(
+                    checked = !mediaBackupWifiOnly,
+                    onCheckedChange = { checked ->
+                        mediaBackupWifiOnly = !checked
+                        viewModel.setMediaBackupWifiOnly(!checked)
+                    },
+                    enabled = mediaBackupEnabled
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
             SectionHeader("Notificaciones", Color(0xFF5C6BC0))
@@ -422,6 +467,36 @@ fun SetupScreen(
                     }
                 }
             )
+
+            var hasAllFilesAccess by remember {
+                mutableStateOf(
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Environment.isExternalStorageManager() else true
+                )
+            }
+            val allFilesAccessLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult()
+            ) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    hasAllFilesAccess = Environment.isExternalStorageManager()
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            PermissionCard(
+                title = "Acceso a todos los archivos",
+                description = "Necesario para respaldar los estados y archivos privados de WhatsApp (no indexados por el sistema)",
+                isGranted = hasAllFilesAccess,
+                accentColor = Color(0xFFFFA726),
+                onClick = {
+                    if (!hasAllFilesAccess && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        allFilesAccessLauncher.launch(
+                            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                data = "package:${context.packageName}".toUri()
+                            }
+                        )
+                    }
+                }
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
             SectionHeader("Apagado falso", Color(0xFF5C6BC0))
 
@@ -498,61 +573,6 @@ fun SetupScreen(
                     }
                 }
             )
-            // botones para fotos
-            Spacer(modifier = Modifier.height(24.dp))
-            SectionHeader("Copia de seguridad de fotos", Color(0xFF26A69A))
-
-            var mediaBackupEnabled by remember {
-                mutableStateOf(com.devg2studios.seguromovilultima.data.local.SecuritySettingsCache.current.mediaBackupEnabled)
-            }
-            var mediaBackupWifiOnly by remember {
-                mutableStateOf(com.devg2studios.seguromovilultima.data.local.SecuritySettingsCache.current.mediaBackupWifiOnly)
-            }
-
-            ProtectionToggleCard(
-                isActive = mediaBackupEnabled,
-                enabled = hasMediaPermission,
-                onCheckedChange = { checked ->
-                    if(!hasMediaPermission) return@ProtectionToggleCard
-                    mediaBackupEnabled = checked
-                    viewModel.setMediaBackupEnabled(checked)
-                    if (checked) {
-                        context.startForegroundService(
-                            Intent(context, MediaBackupService::class.java)
-                        )
-                    } else {
-                        context.stopService(Intent(context, MediaBackupService::class.java))
-                    }
-                }
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Solo con Wi-Fi",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                        text = "Evita gastar datos móviles al respaldar fotos y videos",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = mediaBackupWifiOnly,
-                    onCheckedChange = { checked ->
-                        mediaBackupWifiOnly = checked
-                        viewModel.setMediaBackupWifiOnly(checked)
-                    },
-                    enabled = mediaBackupEnabled
-                )
-            }
-
             if (isXiaomi) {
                 Spacer(modifier = Modifier.height(24.dp))
                 SectionHeader("Ajustes específicos de Xiaomi", Color(0xFFEF5350))

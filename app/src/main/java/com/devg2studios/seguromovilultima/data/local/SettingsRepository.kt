@@ -31,7 +31,7 @@ data class SecuritySettings(
 
     // backup fotos
     val mediaBackupEnabled: Boolean = false,
-    val mediaBackupWifiOnly: Boolean = true
+    val mediaBackupWifiOnly: Boolean = false
 )
 
 @Singleton
@@ -80,7 +80,7 @@ class SettingsRepository @Inject constructor(
 
             // backup fotos
             mediaBackupEnabled = prefs[Keys.MEDIA_BACKUP_ENABLED] ?: false,
-            mediaBackupWifiOnly = prefs[Keys.MEDIA_BACKUP_WIFI_ONLY] ?: true
+            mediaBackupWifiOnly = prefs[Keys.MEDIA_BACKUP_WIFI_ONLY] ?: false
         )
     }
     suspend fun setFailedAttemptDetectionEnabled(enabled: Boolean) {
