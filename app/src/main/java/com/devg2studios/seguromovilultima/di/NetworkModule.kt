@@ -1,6 +1,7 @@
 
 package com.devg2studios.seguromovilultima.di
 
+import android.util.Log
 import com.devg2studios.seguromovilultima.data.remote.api.AuthApi
 import com.devg2studios.seguromovilultima.data.remote.api.CommandApi
 import com.devg2studios.seguromovilultima.data.remote.api.backup.MediaBackupApi
@@ -58,6 +59,33 @@ object NetworkModule {
             .callTimeout(15, TimeUnit.MINUTES)    // límite total de la llamada completa
             .retryOnConnectionFailure(true)
             .addInterceptor(logging)
+            .eventListener(object : okhttp3.EventListener() {
+                var t0 = 0L
+                override fun callStart(call: okhttp3.Call) {
+                    t0 = System.currentTimeMillis()
+                }
+                override fun dnsStart(call: okhttp3.Call, domainName: String) {
+                    Log.d("NET_TIMING", "dnsStart +${System.currentTimeMillis()-t0}ms")
+                }
+                override fun dnsEnd(call: okhttp3.Call, domainName: String, inetAddressList: List<java.net.InetAddress>) {
+                    Log.d("NET_TIMING", "dnsEnd +${System.currentTimeMillis()-t0}ms addrs=$inetAddressList")
+                }
+                override fun connectStart(call: okhttp3.Call, inetSocketAddress: java.net.InetSocketAddress, proxy: java.net.Proxy) {
+                    Log.d("NET_TIMING", "connectStart +${System.currentTimeMillis()-t0}ms -> $inetSocketAddress")
+                }
+                override fun connectFailed(call: okhttp3.Call, inetSocketAddress: java.net.InetSocketAddress, proxy: java.net.Proxy, protocol: okhttp3.Protocol?, ioe: java.io.IOException) {
+                    Log.d("NET_TIMING", "connectFailed +${System.currentTimeMillis()-t0}ms -> $inetSocketAddress ($ioe)")
+                }
+                override fun secureConnectEnd(call: okhttp3.Call, handshake: okhttp3.Handshake?) {
+                    Log.d("NET_TIMING", "tlsEnd +${System.currentTimeMillis()-t0}ms")
+                }
+                override fun responseHeadersStart(call: okhttp3.Call) {
+                    Log.d("NET_TIMING", "responseHeadersStart +${System.currentTimeMillis()-t0}ms")
+                }
+                override fun callEnd(call: okhttp3.Call) {
+                    Log.d("NET_TIMING", "callEnd +${System.currentTimeMillis()-t0}ms")
+                }
+            })
             .build()
     }
 

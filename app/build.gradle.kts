@@ -17,7 +17,7 @@ android {
         minSdk = 26   // mínimo recomendado: necesitas Foreground Service types de O+
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.4-beta"
     }
     buildFeatures {
         compose = true
